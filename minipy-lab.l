@@ -4,8 +4,6 @@
 
 #include "minipy-lab.tab.h"
 
-extern int yylval;
-
 /*  any C declaration  */
 %}
 
@@ -17,7 +15,7 @@ number   {digit}+
 
 id       {letter}({letter}|{digit})*
 
-real     {number}'.'{number}?|{number}?'.'{number}
+real     {number}\.{number}?|{number}?\.{number}
 
 %%
 [ \t]+      {/*do nothing , just skip */}
@@ -26,16 +24,22 @@ real     {number}'.'{number}?|{number}?'.'{number}
               return INT;
             }
 {real}      {
-              yylval.real = atof(yytext);
+              yylval.real = (float)atof(yytext);
               return REAL;
             }
 {id}        {
-              yylval.name = yytext;
+              int len = strlen(yytext);
+              yylval.name = (char*)malloc(len);
+              strcpy(yylval.name, yytext);
+              yylval.name[len] = '\0';
               return ID; 
             }
 \"(\\.|[^\\"])*\"	{
-              yylval.name = yytext;
-             return(STRING_LITERAL); 
+                int len = strlen(yytext);
+                yylval.name = (char*)malloc(len);
+                strcpy(yylval.name, yytext);
+                yylval.name[len] = '\0';
+                return(STRING_LITERAL); 
                   }
-.|\n        { return yylval = yytext[0];}
+.|\n        { return yylval.c_value = yytext[0];}
 %%
