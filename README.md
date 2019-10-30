@@ -9,3 +9,6 @@ simple interpreter for minipy(subset of python)
 yacc代码中完成了文法符号属性的设计
 - 已实现四则运算功能（可以跑）
 - 实现存储变量功能
+
+### 10/30 吴健宗
+上传了`property.h`文法符号属性设计，用来提交第一阶段报告
