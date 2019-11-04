@@ -11,7 +11,7 @@ using namespace std;
 #include "lex.yy.c"
 
 extern "C" {
-int yyparse();
+int yyparse(void);
 void yyerror(char *s){cout << s << endl<<"miniPy> ";}
 int yywrap(void){return 1;}
 }
@@ -27,6 +27,7 @@ typedef struct num_struct
 	};
 }num_struct;
 //链表非终结符
+struct type_struct;
 typedef struct list_struct
 {
 	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
@@ -37,7 +38,7 @@ typedef struct list_struct
 		list_struct* list_head;
 	};
 	list_struct* next;*/
-	vector<*type_struct> list_vec; //在链表赋值的时候，变量的值直接取出
+	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
 }list_struct;
 //链表带索引
 typedef struct list_index
@@ -51,7 +52,7 @@ typedef struct list_index
 	};
 	list_struct* next;*/
 	int index;
-	vector<*type_struct> list_vec; //在链表赋值的时候，变量的值直接取出
+	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
 }list_index;
 //类型非终结符
 typedef struct type_struct
@@ -70,7 +71,123 @@ typedef struct type_struct
 //变量表
 map<char*, type_struct*> var_map;
 
-//内置函数
+//list打印
+void printobj(type_struct* obj){
+	switch(obj->type){
+			case 0:{
+				if(obj->num->type == 0)
+					printf("%d\n", obj->num->int_value);//w
+				else
+					printf("%.3f\n", obj->num->f_value);
+				break;
+			}
+			case 1:{
+				/*查找该ID*/
+				//不可能，列表里无ID
+				break;
+			}
+			case 2:{
+				//print string
+				printf("\"%s\"",obj->str);///////////////
+				break;
+			}
+			case 3:{
+				//print list
+				vector<type_struct*>::iterator iter;
+				iter=obj->list_head->list_vec.begin();
+				printf("[");
+				printobj(*iter);
+				for(iter++;iter!=obj->list_head->list_vec.end();iter++)
+				{
+					printf(",");
+					printobj(*iter);
+				}
+				printf("]");
+				break;
+			}
+		}
+}
+
+char* type(type_struct* obj){//////////////////uncompleted
+	switch(obj->type){
+			case 0:{
+				
+				break;
+			}
+			case 1:{
+				
+				break;
+			}
+			case 2:{
+				break;
+			}
+			case 3:{
+				break;
+			}
+		}
+}
+
+void shallowcopy(type_struct* src,type_struct* dest){
+	switch(src->type){
+		case 0:{
+			dest->num=(num_struct*)malloc(sizeof(num_struct));
+			if(src->num->type == 0)
+				dest->num->int_value = src->num->int_value;
+			else
+				dest->num->f_value = src->num->f_value;
+			break;
+		}
+		case 1:{
+			//impossible
+			break;
+		}
+		case 2:{
+			dest->str=(char*)malloc(strlen(src->str)+1);
+			strcpy(dest->str,src->str);
+			break;
+		}
+		case 3:{
+			dest->list_head = src->list_head;
+			break;
+		}
+	}
+	dest->type = src->type;
+}
+
+void append(type_struct* list,type_struct* item){
+	if(list->type != 3 || item->type == 1)
+	{
+		yyerror("append error");
+	}
+	else
+	{
+		list->list_head->list_vec.push_back(item);
+	}
+}
+
+void extend(type_struct* list1,type_struct* list2){
+	if(list1->type != 3 || list2->type != 3)
+	{
+		yyerror("append error");
+	}
+	else
+	{
+		list1->list_head->list_vec.insert(list1->list_head->list_vec.end(),list2->list_head->list_vec.begin(),list2->list_head->list_vec.end());
+	}
+}
+
+int len(type_struct* list){
+	if(list->type == 0 || list->type == 1)
+		yyerror("object of this type has no len()");
+	else if(list->type == 2)
+	{
+		return strlen(list->str);
+	}
+	else
+	{
+		return list->list_head->list_vec.size();
+	}
+}
 
 %}
 %union{
@@ -88,7 +205,7 @@ map<char*, type_struct*> var_map;
 %token <name> STRING_LITERAL
 %type <num_symbol> number
 %type <list_symbol> List List_items
-%type <type_symbol> atom atom_expr add_expr mul_expr factor assignExpr sub_expr
+%type <type_symbol> atom atom_expr add_expr mul_expr factor assignExpr sub_expr stat slice_op
 
 %left '+' '-'
 %left '*' '/' '%'
@@ -124,18 +241,18 @@ stat  : assignExpr
 					printobj(iter->second);
 				else
 				{
-					yyerror(sprintf("name '%s' is not defined",$1->id));
+					yyerror("name is not defined");
 				}
 				break;
 			}
 			case 2:{
 				//print string
-				printf("\"%s\""，$$->str);///////////////
+				printf("\"%s\"",$$->str);
 				break;
 			}
 			case 3:{
 				//print list
-				vector<*type_struct>::iterator iter;
+				vector<type_struct*>::iterator iter;
 				for(iter=$$->list_head->list_vec.begin();iter!=$$->list_head->list_vec.end();iter++)
 				break;
 			}
@@ -177,7 +294,7 @@ assignExpr:
 			}
 			else
 			{
-				yyerror("can't assign to literal")
+				yyerror("can't assign to literal");
 			}
 		}
       | add_expr 
@@ -225,12 +342,13 @@ factor : '+' factor %prec unimus
 				map<char*, type_struct*>::iterator iter;
 				iter = var_map.find($1->id);
 				if(iter != var_map.end())
-					//$$=iter->second;               //浅拷贝!!!!!!!!!!!!!!!!!!!!
+				{
 					$$=(type_struct*)malloc(sizeof(type_struct));
 					shallowcopy(iter->second,$$);
+				}
 				else
 				{
-					yyerror(sprintf("name '%s' is not defined",$1->id));
+					yyerror("name is not defined");
 				}
 			}
 			else if($1->type == 4)
@@ -333,7 +451,7 @@ atom_expr : atom
 				}
 				else
 				{
-					yyerror(sprintf("name '%s' is not defined",$1->id));////////////////
+					yyerror("name is not defined");
 				}  
 			}
 
@@ -350,7 +468,7 @@ atom_expr : atom
 				lastindex = $5 == NULL?(indexstep>0?size:-1)
 				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
 
-				vector<*type_struct> newvec;
+				vector<type_struct*> newvec;
 				int i;
 				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
 					for(i=firstindex;i<lastindex && i<size && i>-1;i+=indexstep)
@@ -385,7 +503,7 @@ atom_expr : atom
 				}
 				else
 				{
-					yyerror(sprintf("name '%s' is not defined",$1->id));////////////////
+					yyerror("name is not defined");////////////////
 				}  
 			}
 
@@ -437,7 +555,7 @@ arglist : add_expr
 List  : '[' ']'
 		{
 			$$ = (list_struct*)malloc(sizeof(list_struct));
-			$$->list_vec=vector<*type_struct> ();
+			$$->list_vec=vector<type_struct*> ();
 		}
       | '[' List_items opt_comma ']' 
 	  {
@@ -451,7 +569,7 @@ List_items
       : add_expr
 	  {
 		$$ = (list_struct*)malloc(sizeof(list_struct));
-		$$->list_vec=vector<*type_struct> (1);
+		$$->list_vec=vector<type_struct*> (1);
 		/*if($1->type == 1) //impossible
 		{
 			map<char*, type_struct*>::iterator iter;
@@ -509,7 +627,7 @@ add_expr : add_expr '+' mul_expr
 				}
 				case 3:{
 					if(3!=$3->type)
-						yyerror("TypeError: unsupported operand type(s) for +: 'int' and 'list'") //"uncompleted
+						yyerror("TypeError: unsupported operand type(s) for +: 'int' and 'list'"); //"uncompleted
 					else
 					{
 						$$ = (type_struct*)malloc(sizeof(type_struct));

@@ -3,6 +3,7 @@
 #define _PROPERTY_H_
 
 #include <map>
+#include <string.h>
 
 //数值非终结符
 typedef struct num_struct
@@ -14,39 +15,45 @@ typedef struct num_struct
 		float f_value;
 	};
 }num_struct;
-
-typedef struct list_struct list_struct;
-
-//链表结点非终结符
-typedef struct list_node
+//链表非终结符
+struct type_struct;
+typedef struct list_struct
 {
-	int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
-	union
+	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
+	/*union
 	{
 		num_struct* num;
 		char* str;
-		list_struct* list;
+		list_struct* list_head;
 	};
-	list_struct* next;
-}list_node;
-
-//链表非终结符
-typedef struct list_struct
-{
-    list_node* list_head;
-    list_node* list_tail;
+	list_struct* next;*/
+	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
 }list_struct;
-
+//链表带索引
+typedef struct list_index
+{
+	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
+	/*union
+	{
+		num_struct* num;
+		char* str;
+		list_struct* list_head;
+	};
+	list_struct* next;*/
+	int index;
+	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
+}list_index;
 //类型非终结符
 typedef struct type_struct
 {
-	int type;	//0:number, 1:ID, 2:string literal, 3:list
+	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index
 	union
 	{
 		num_struct* num;	//number
 		char* id;			//id
 		char* str;			//string literal
-		list_struct* list;   //list
+		list_struct* list_head;	//list
+		list_index* List_Index;
 	};
 }type_struct;
 
@@ -70,12 +77,12 @@ void printobj(type_struct* obj){
 			}
 			case 2:{
 				//print string
-				printf("\"%s\""，obj->str);///////////////
+				printf("\"%s\"",obj->str);///////////////
 				break;
 			}
 			case 3:{
 				//print list
-				vector<*type_struct>::iterator iter;
+				vector<type_struct*>::iterator iter;
 				iter=obj->list_head->list_vec.begin();
 				printf("[");
 				printobj(*iter);
