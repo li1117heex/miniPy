@@ -12,3 +12,41 @@ yacc代码中完成了文法符号属性的设计
 
 ### 10/30 吴健宗
 上传了`property.h`文法符号属性设计，用来提交第一阶段报告
+
+### 11/03 李维晟
+
+- 修改list的底层设计，改为使用vector<type_struct*>
+- `property.h`中增加打印printobj函数，用于递归打印list
+- `property.h`中增加打印shallowcopy函数，用于浅拷贝。不可变对象建立了新存贮空间，而list则沿用同一个vector。
+- 做出如下约定：
+  - 在`assignExpr : atom_expr '=' assignExpr`的时候，存储原来的内存空间，上交浅拷贝的内存空间。赋值时候不可变对象内存已经在`factor : atom_expr`的时候更改过，所有没有影响；而list的赋值也实现了浅拷贝的要求。
+  - 在`factor : atom_expr`的时候，如果检测到atom_expr时ID，就把值浅拷贝出来。这样不可变对象有了新内存空间，list的内存空间不变。
+  - 在列表里包含一个变量的时候，变量的值已经被取出。所以在`List_items : add_expr | List_items ',' add_expr` 的时候，不可能有ID类型，更不可能出现list里含有ID类型的情况。
+  - 其余所有不可变对象规约，比如计算，都可以利用原来的内存空间进行。而列表的运算则建立了新的列表，不能对原vector更改。
+  - 总之，在对变量指向的不可变对象使用的时候，不可以改变不可变对象的值。通过新建内存空间与浅拷贝，牢牢把握`assignExpr : atom_expr '=' assignExpr`和`factor : atom_expr`两个关口，实现了这一点。
+
+- 实现了字符串打印
+- 原来打印位置错误，挪了上去
+- 实现列表取元素区间
+
+- 实现列表取元素，并通过推迟取元素完成类似`a[0]=1`赋值的正确。
+  - 增加type=4，并将其范围控制在`atom_expr`内，不干扰其他，此时其指向`list_index`结构体
+  - 取元素被推迟到`atom_expr`进行下一次规约时进行。
+  - 在`assignExpr : atom_expr '=' assignExpr`的时候，完成要求赋值。
+  - 在`factor : atom_expr`时，完成最后一次取值。
+
+- 实现了字符串取元素形成新字符串。
+- 列表创建
+- 列表四则运算
+- 列表的append,extend方法，类型检查也实现了
+- len函数，对于字符串与列表
+
+还没有实现的：
+- 字符串取元素区间
+- 其他四则运算
+- print函数与相关文法
+
+远景展望：
+- 布尔类型
+- list comprehension
+- 上下方向键？

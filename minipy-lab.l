@@ -36,7 +36,7 @@ real     {number}\.{number}?|{number}?\.{number}
             }
 \"(\\.|[^\\"])*\"	{
                 int len = strlen(yytext);
-                yylval.name = (char*)malloc(len);
+                yylval.name = (char*)malloc(len);//+1?
                 strcpy(yylval.name, yytext);
                 yylval.name[len] = '\0';
                 return(STRING_LITERAL); 

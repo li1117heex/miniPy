@@ -6,6 +6,7 @@ using namespace std;
 #include <iostream>
 #include <string>
 #include <map>
+#include <vector>
 
 #include "lex.yy.c"
 
@@ -28,25 +29,41 @@ typedef struct num_struct
 //链表非终结符
 typedef struct list_struct
 {
-	int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
-	union
+	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
+	/*union
 	{
 		num_struct* num;
 		char* str;
 		list_struct* list_head;
 	};
-	list_struct* next;
+	list_struct* next;*/
+	vector<*type_struct> list_vec; //在链表赋值的时候，变量的值直接取出
 }list_struct;
+//链表带索引
+typedef struct list_index
+{
+	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
+	/*union
+	{
+		num_struct* num;
+		char* str;
+		list_struct* list_head;
+	};
+	list_struct* next;*/
+	int index;
+	vector<*type_struct> list_vec; //在链表赋值的时候，变量的值直接取出
+}list_index;
 //类型非终结符
 typedef struct type_struct
 {
-	int type;	//0:number, 1:ID, 2:string literal, 3:list
+	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index
 	union
 	{
 		num_struct* num;	//number
 		char* id;			//id
 		char* str;			//string literal
 		list_struct* list_head;	//list
+		list_index* List_Index;
 	};
 }type_struct;
 
@@ -89,13 +106,48 @@ Lines : Lines  stat '\n' prompt
 prompt : {cout << "miniPy> ";}
        ;
 stat  : assignExpr
+		{
+		$$ = $1;
+		switch($$->type){
+			case 0:{
+				if($$->num->type == 0)
+					printf("%d\n", $$->num->int_value);//w
+				else
+					printf("%.3f\n", $$->num->f_value);
+				break;
+			}
+			case 1:{
+				/*查找该ID*/////////////////////////////////////////////////
+				map<char*, type_struct*>::iterator iter;
+				iter = var_map.find($1->id);
+				if(iter != var_map.end())
+					printobj(iter->second);
+				else
+				{
+					yyerror(sprintf("name '%s' is not defined",$1->id));
+				}
+				break;
+			}
+			case 2:{
+				//print string
+				printf("\"%s\""，$$->str);///////////////
+				break;
+			}
+			case 3:{
+				//print list
+				vector<*type_struct>::iterator iter;
+				for(iter=$$->list_head->list_vec.begin();iter!=$$->list_head->list_vec.end();iter++)
+				break;
+			}
+		}
+	  }
       ;
 assignExpr:
         atom_expr '=' assignExpr
 		{			
 			if($1->type == 1)	/*ID，存储变量到变量表*/
 			{	
-				map<char*, type_struct*>::iterator iter;
+				map<char*, type_struct*>::iterator iter;//可以用count来写
 				for(iter = var_map.begin(); iter != var_map.end();)
 				{
 					if(strcmp(iter->first, $1->id) == 0)	/*判断相等，把之前的去掉再insert新的*/
@@ -107,56 +159,30 @@ assignExpr:
 						iter++;
 					}
 				}
-				var_map.insert(map<char*, type_struct*>::value_type($1->id, $3));
+				var_map.insert(map<char*, type_struct*>::value_type($1->id, $3));  //存储原来的，上交浅拷贝的
+				shallowcopy($3,$1);
+				$$ = $1;
 			}
-
-			switch($3->type){
-				case 0:{
-					if($3->num->type == 0)
-						$1->num->int_value = $3->num->int_value;
-					else
-						$1->num->f_value = $3->num->f_value;
-					$$ = $1;
-					break;
+			else if($1->type == 4)
+			{
+				/*while(($1->list_head->list_vec[$1->list_head->index])->list_head->flag==1)
+				{
+					$1=$1->list_head->list_vec[$1->list_head->index];
 				}
-				case 1:{
-					yyerror("ID cannot be a right value!");
-					break;
-				}
-				case 2:{
-					$1->str = $3->str;
-					break;
-				}
-				case 3:{
-					$1->list_head = $3->list_head;
-					break;
-				}
+				shallowcopy($3,$1->list_head->list_vec[$1->list_head->index]);
+				$$ = $1->list_head->list_vec[$1->list_head->index];*/
+				$1->List_Index->list_vec[$1->List_Index->index] = $3;    //存储原来的，上交浅拷贝的
+				shallowcopy($3,$1);
+				$$ = $1;
 			}
-			$1->type = $3->type;
-			$$ = $1;
+			else
+			{
+				yyerror("can't assign to literal")
+			}
 		}
       | add_expr 
 	  {
-		$$ = $1;
-		switch($$->type){
-			case 0:{
-				if($$->num->type == 0)
-					printf("%d\n", $$->num->int_value);
-				else
-					printf("%.3f\n", $$->num->f_value);
-				break;
-			}
-			case 1:{
-				/*查找该ID*/
-				break;
-			}
-			case 2:{
-				break;
-			}
-			case 3:{
-				break;
-			}
-		}
+		$$ = $1;  //挪到上面
 	  }
       ;
 number : INT
@@ -193,11 +219,36 @@ factor : '+' factor %prec unimus
 	   }
        | atom_expr
 	   {
-		   $$ = $1;
+		    $$ = $1;//设计理念：所有高于atom_expr的ID都已经把值取出        //应该讨论：要不要设计新数据结构，type不能为ID////////////
+			if($$->type == 1)
+			{
+				map<char*, type_struct*>::iterator iter;
+				iter = var_map.find($1->id);
+				if(iter != var_map.end())
+					//$$=iter->second;               //浅拷贝!!!!!!!!!!!!!!!!!!!!
+					$$=(type_struct*)malloc(sizeof(type_struct));
+					shallowcopy(iter->second,$$);
+				else
+				{
+					yyerror(sprintf("name '%s' is not defined",$1->id));
+				}
+			}
+			else if($1->type == 4)
+			{
+				/*while(($1->list_head->list_vec[$1->list_head->index])->list_head->flag==1)
+				{
+					$1=$1->list_head->list_vec[$1->list_head->index];
+				}
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				shallowcopy($1->list_head->list_vec[$1->list_head->index],$$);*/
+
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				shallowcopy($1->List_Index->list_vec[$1->List_Index->index],$$);
+			}
 	   }
 	   | '(' add_expr ')'
 	   {
-		   $$ = $2;
+		    $$ = $2;
 	   }
        ; 
 atom  : ID
@@ -226,23 +277,50 @@ atom  : ID
 	  }
       ;
 slice_op :  /*  empty production */
+		{
+			$$=NULL;
+		}
         | ':' add_expr 
+		{
+			$$ = $2;
+			if($$->type != 0 || $$->num->type != 0)
+				yyerror("index must be int type!"); 
+			else if($$->num->int_value == 0)
+				yyerror("slice step cannot be zero"); 
+		}
         ;
 sub_expr:  /*  empty production */
+		{
+			$$=NULL;
+		}
         | add_expr
+		{
+			$$ = $1;
+			if($$->type != 0 || $$->num->type != 0)
+				yyerror("index must be int type!"); 
+		}
         ;        
 atom_expr : atom
 		{
 			$$ = $1;
 		}
         | atom_expr  '[' sub_expr  ':' sub_expr  slice_op ']' 	/*列表取元素区间*/
-        | atom_expr  '[' add_expr ']'							/*列表取元素*/
 		{
+			//$1           $3             $5         $6
 			type_struct* var;
+			int firstindex,lastindex,indexstep;
 
-			if($1->type != 1)
+			if($1->type == 0)
 			{
-				yyerror("object must be indicated with a variable!");
+				yyerror("TypeError: 'int' object is not subscriptable");   ////////////////////////////"
+			}
+			else if($1->type == 2 || $1->type == 3)
+			{
+				var = $1;
+			}
+			else if($1->type == 4)
+			{
+				var = $1->List_Index->list_vec[$1->List_Index->index];
 			}
 			else	/*ID，取变量*/
 			{
@@ -255,41 +333,93 @@ atom_expr : atom
 				}
 				else
 				{
-					cout<<"Do not Find"<<endl;  
+					yyerror(sprintf("name '%s' is not defined",$1->id));////////////////
+				}  
+			}
+
+			if(var->type == 0 || var->type == 1)
+				yyerror("the object must be a list or string");
+			else if(var->type == 2)
+				yyerror("string complex slice not support yet"); //not support yet
+			else
+			{
+				int size = var->list_head->list_vec.size();
+				indexstep = $6 == NULL?1:$6->num->int_value;
+				firstindex = $3 == NULL?(indexstep>0?0:size-1)
+				:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
+				lastindex = $5 == NULL?(indexstep>0?size:-1)
+				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
+
+				vector<*type_struct> newvec;
+				int i;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;i<lastindex && i<size && i>-1;i+=indexstep)
+						newvec.push_back(var->list_head->list_vec[i]);
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				$$->type=3;
+				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
+				$$->list_head->list_vec=newvec;
+			}
+		}
+        | atom_expr  '[' add_expr ']'							/*列表取元素*/
+		{
+			type_struct* var;
+			int index;
+
+			if($1->type != 1 && $1->type != 4)
+			{
+				var = $1;
+			}
+			else if($1->type == 4)
+			{
+				var = $1->List_Index->list_vec[$1->List_Index->index];
+			}
+			else	/*ID，取变量*/
+			{
+				map<char*, type_struct*>::iterator iter;
+				iter = var_map.find($1->id);
+				if(iter != var_map.end())  
+       			{
+					cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+					var = iter->second;
+				}
+				else
+				{
+					yyerror(sprintf("name '%s' is not defined",$1->id));////////////////
 				}  
 			}
 
 			if($3->type != 0 || $3->num->type != 0)
 				yyerror("index must be int type!");
-			else if($3->num->int_value < 0)
-				yyerror("index must >0 !");
-			else if(var->type != 3)
-				yyerror("the object must be a list!");
-			else
+			/*else if($3->num->int_value < 0)
+				yyerror("index must >0 !");*/ /////////////////////
+			else if(var->type == 0 || var->type == 1)
+				yyerror("the object must be a list or string");//////////
+			else if(var->type == 2)
 			{
-				int index = $3->num->int_value;
-				list_struct* node = var->list_head;
-				while(index > 0)
-				{
-					node = node->next;
-					index--;
-				}
+				index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+strlen(var->str);
+				if(index >=strlen(var->str) || index < 0 )
+					yyerror("string index out of range");
 				$$ = (type_struct*)malloc(sizeof(type_struct));
-				$$->type = node->type;
-				switch($$->type){
-					case 0:{		/*number*/
-						$$->num = node->num;
-						break;
-					}
-					case 2:{		/*string_literal*/
-						$$->str = node->str;
-						break;
-					}
-					case 3:{		/*list*/
-						$$->list_head = node->list_head;
-						break;
-					}
-				}
+				$$->type=2;
+				$$->str=(char*)malloc(2);
+				strncpy(var->str+index,$$->str,1);
+				$$->str[1]='\0';
+			}
+			else //var->type == 3
+			{
+				index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+var->list_head->list_vec.size();
+				if(index >=var->list_head->list_vec.size() || index < 0 )
+					yyerror("string index out of range");
+				//$$ = var->list_head->list_vec[index];  //vec存的是指针，直接赋值
+				//var->flag =1;
+				//var->index = index;
+				$$ = (type_struct*)malloc(sizeof(type_struct));
+				$$->type=4;
+				$$->List_Index = (list_index*)malloc(sizeof(list_index));
+				$$->List_Index->index = index;
+				$$->List_Index->list_vec = var->list_head->list_vec;
+
 			}
 		}
         | atom_expr  '.' atom '(' arglist opt_comma ')'			/*取属性*/
@@ -307,8 +437,7 @@ arglist : add_expr
 List  : '[' ']'
 		{
 			$$ = (list_struct*)malloc(sizeof(list_struct));
-			$$->type = 0;		//暂时赋为number类型
-			$$->next = NULL;	//空链表
+			$$->list_vec=vector<*type_struct> ();
 		}
       | '[' List_items opt_comma ']' 
 	  {
@@ -322,52 +451,35 @@ List_items
       : add_expr
 	  {
 		$$ = (list_struct*)malloc(sizeof(list_struct));
-		$$->type = $1->type;
-		switch($$->type){
-			case 0:{
-				$$->num = $1->num;
-				break;
+		$$->list_vec=vector<*type_struct> (1);
+		/*if($1->type == 1) //impossible
+		{
+			map<char*, type_struct*>::iterator iter;
+			iter = var_map.find($1->id);
+			if(iter != var_map.end())
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				shallowcopy(iter->second,$$);
+			else
+			{
+				yyerror(sprintf("name '%s' is not defined",$1->id));
 			}
-			case 1:{
-				yyerror("ID cannot be a member of a list!");
-				break;
-			}
-			case 2:{
-				$$->str = $1->str;
-				break;
-			}
-			case 3:{
-				$$->list_head = $1->list_head;
-				break;
-			}
-		}
-		$$->next = NULL;	//尾端
+		}*/
+		$$->list_vec.push_back($1);
 	  }
       | List_items ',' add_expr 
 	  {
 		$$ = $1;
-		list_struct* tempp = (list_struct*)malloc(sizeof(list_struct));
-		tempp->type = $3->type;
-		switch($3->type){
-			case 0:{
-				tempp->num = $3->num;
-				break;
-			}
-			case 1:{
-				yyerror("ID cannot be a member of a list!");
-				break;
-			}
-			case 2:{
-				tempp->str = $3->str;
-				break;
-			}
-			case 3:{
-				tempp->list_head = $3->list_head;
-				break;
-			}
-		}
-		tempp->next = NULL;
-		$$->next = tempp;
+		/*if($3->type == 1)         //impossible
+			map<char*, type_struct*>::iterator iter;
+			iter = var_map.find($1->id);
+			if(iter != var_map.end())
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				shallowcopy(iter->second,$$);
+			else
+			{
+				yyerror(sprintf("name '%s' is not defined",$1->id));
+			}*/	
+		$$->list_vec.push_back($3);
 	  }
       ;
 add_expr : add_expr '+' mul_expr
@@ -395,7 +507,51 @@ add_expr : add_expr '+' mul_expr
 					}
 					break;
 				}
+				case 3:{
+					if(3!=$3->type)
+						yyerror("TypeError: unsupported operand type(s) for +: 'int' and 'list'") //"uncompleted
+					else
+					{
+						$$ = (type_struct*)malloc(sizeof(type_struct));
+						$$->type = 3;
+						$$->list_head = (list_struct*)malloc(sizeof(list_struct));
+						vector<type_struct*> newvec($1->list_head->list_vec.size()+$3->list_head->list_vec.size());
+						newvec.insert(newvec.end(),$1->list_head->list_vec.begin(),$1->list_head->list_vec.end());
+						newvec.insert(newvec.end(),$3->list_head->list_vec.begin(),$3->list_head->list_vec.end());
+						$$->list_head->list_vec = newvec;
+					}
+					break;
+				}
 			}
+			/*if($1->type!=$3->type)
+				yyerror("TypeError: unsupported operand type(s) for +: 'int' and 'list'") //uncompleted
+			else
+			{
+				switch($1->type){
+					case 0:{
+						//uncompleted//可以传指针
+						break;
+					}
+					case 1:{
+						//impossible
+						break;
+					}
+					case 2:{
+						//uncompleted
+						break;
+					}
+					case 3:{
+						$$ = (type_struct*)malloc(sizeof(type_struct));
+						$$->type = 3;
+						$$->list_head = (list_struct*)malloc(sizeof(list_struct));
+						vector<type_struct*> newvec($1->list_head->list_vec.size()+$3->list_head->list_vec.size());
+						newvec.insert(newvec.end(),$1->list_head->list_vec.begin(),$1->list_head->list_vec.end());
+						newvec.insert(newvec.end(),$3->list_head->list_vec.begin(),$3->list_head->list_vec.end());
+						$$->list_head->list_vec = newvec;
+						break;
+					}
+				}
+			}*/
 		}
 	      |  add_expr '-' mul_expr
 		{
@@ -453,6 +609,20 @@ mul_expr : mul_expr '*' factor
 						}
 					}
 					break;
+				}
+				case 3:{
+					if($3->type != 0 || $3->num->type != 0)
+						yyerror("can't multiply sequence by non-int of type 'list'");
+					int i,mul=$3->num->int_value;
+					$$ = (type_struct*)malloc(sizeof(type_struct));
+					$$->type = 3;
+					$$->list_head = (list_struct*)malloc(sizeof(list_struct));
+					vector<type_struct*> newvec($1->list_head->list_vec.size()*mul);
+					for(i=0;i<mul;i++)
+					{
+						newvec.insert(newvec.end(),$1->list_head->list_vec.begin(),$1->list_head->list_vec.end());
+					}
+					$$->list_head->list_vec = newvec;
 				}
 			}
 		}
