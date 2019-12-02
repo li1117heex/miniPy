@@ -67,3 +67,4 @@ yacc代码中完成了文法符号属性的设计
     - 创建内置函数表map<char*, 函数指针> fun_map(在main中进行函数表初始化), 保存已实现的内置函数, 根据输入的字符串调用
     - 类似的, 创建列表方法表map<char*, 函数指针> list_fun_map
     - 函数参数arglist, 定义为list_type, 一个一个读取其元素(每一个参数)即可
+    - type_struct.type 中加一个void类型, 例如规定为5
