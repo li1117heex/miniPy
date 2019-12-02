@@ -29,16 +29,16 @@ real     {number}\.{number}?|{number}?\.{number}
             }
 {id}        {
               int len = strlen(yytext);
-              yylval.name = (char*)malloc(len);
+              yylval.name = (char*)malloc(len + 1);
               strcpy(yylval.name, yytext);
               yylval.name[len] = '\0';
               return ID; 
             }
 \"(\\.|[^\\"])*\"	{
                 int len = strlen(yytext);
-                yylval.name = (char*)malloc(len);//+1?
-                strcpy(yylval.name, yytext);
-                yylval.name[len] = '\0';
+                yylval.name = (char*)malloc(len - 1);
+                strcpy(yylval.name, yytext + 1);
+                yylval.name[len-2] = '\0';
                 return(STRING_LITERAL); 
                   }
 .|\n        { return yylval.c_value = yytext[0];}

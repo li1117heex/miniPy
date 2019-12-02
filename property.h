@@ -1,9 +1,11 @@
-/*文法符号属性设计*/
 #ifndef _PROPERTY_H_
 #define _PROPERTY_H_
 
+#include <iostream>
 #include <map>
 #include <string.h>
+#include <vector>
+using namespace std;
 
 //数值非终结符
 typedef struct num_struct
@@ -19,29 +21,13 @@ typedef struct num_struct
 struct type_struct;
 typedef struct list_struct
 {
-	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
-	/*union
-	{
-		num_struct* num;
-		char* str;
-		list_struct* list_head;
-	};
-	list_struct* next;*/
-	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
+	vector<type_struct*>* list_vec; //在链表赋值的时候，变量的值直接取出
 }list_struct;
 //链表带索引
 typedef struct list_index
 {
-	//int type;	//链表内内容类型，0:number, 2:string literal, 3:list （为了和type_struct保持一致）
-	/*union
-	{
-		num_struct* num;
-		char* str;
-		list_struct* list_head;
-	};
-	list_struct* next;*/
 	int index;
-	vector<type_struct*> list_vec; //在链表赋值的时候，变量的值直接取出
+	vector<type_struct*>* list_vec; //在链表赋值的时候，变量的值直接取出
 }list_index;
 //类型非终结符
 typedef struct type_struct
@@ -58,144 +44,27 @@ typedef struct type_struct
 }type_struct;
 
 //变量表
-map<char*, type_struct*> var_map;
+static map<char*, type_struct*> var_map;
 
-//list打印
-void printobj(type_struct* obj){
-	switch(obj->type){
-			case 0:{
-				if(obj->num->type == 0)
-					printf("%d\n", obj->num->int_value);//w
-				else
-					printf("%.3f\n", obj->num->f_value);
-				break;
-			}
-			case 1:{
-				/*查找该ID*/
-				//不可能，列表里无ID
-				break;
-			}
-			case 2:{
-				//print string
-				printf("\"%s\"",obj->str);///////////////
-				break;
-			}
-			case 3:{
-				//print list
-				vector<type_struct*>::iterator iter;
-				iter=obj->list_head->list_vec.begin();
-				printf("[");
-				printobj(*iter);
-				for(iter++;iter!=obj->list_head->list_vec.end();iter++)
-				{
-					printf(",");
-					printobj(*iter);
-				}
-				printf("]");
-				break;
-			}
-		}
-}
+//functions
 
-char* type(type_struct* obj){//////////////////uncompleted
-	switch(obj->type){
-			case 0:{
-				
-				break;
-			}
-			case 1:{
-				
-				break;
-			}
-			case 2:{
-				break;
-			}
-			case 3:{
-				break;
-			}
-		}
-}
+//打印type_struct可能包含的类型的对象
+void printobj(type_struct* obj);
 
-void shallowcopy(type_struct* src,type_struct* dest){
-	switch(src->type){
-		case 0:{
-			dest->num=(num_struct*)malloc(sizeof(num_struct));
-			if(src->num->type == 0)
-				dest->num->int_value = src->num->int_value;
-			else
-				dest->num->f_value = src->num->f_value;
-			break;
-		}
-		case 1:{
-			//impossible
-			break;
-		}
-		case 2:{
-			dest->str=(char*)malloc(strlen(src->str)+1);
-			strcpy(dest->str,src->str);
-			break;
-		}
-		case 3:{
-			dest->list_head = src->list_head;
-			break;
-		}
-	}
-	dest->type = src->type;
-}
-
-void append(type_struct* list,type_struct* item){
-	if(list->type != 3 || item->type == 1)
-	{
-		yyerror("append error");
-	}
-	else
-	{
-		list->list_head->list_vec.push_back(item);
-	}
-}
-
-void extend(type_struct* list1,type_struct* list2){
-	if(list1->type != 3 || list2->type != 3)
-	{
-		yyerror("append error");
-	}
-	else
-	{
-		list1->list_head->list_vec.insert(list1->list_head->list_vec.end(),list2->list_head->list_vec.begin(),list2->list_head->list_vec.end());
-	}
-}
-
-void len(type_struct* list){
-	if(list->type == 0 || list->type == 1)
-		yyerror("object of this type has no len()");
-	else if(list->type == 2)
-	{
-		return strlen(list->str);
-	}
-	else
-	{
-		return list->list_head->list_vec.size();
-	}
-}
+//TODO: 这个函数是干什么的？
+//uncompleted
+char* type(type_struct* obj);
 
 /*
-文法符号类型声明
-%}
-%union{
-	char c_value;
-	int integer;
-	float real;
-	char* name;
-	struct num_struct* num_symbol;
-	struct list_struct* list_symbol;
-	struct type_struct* type_symbol;
-}
-%token <name> ID
-%token <integral> INT
-%token <real> REAL
-%token <name> STRING_LITERAL
-%type <num_symbol> number
-%type <list_symbol> List List_items
-%type <type_symbol> atom atom_expr add_expr mul_expr factor assignExpr sub_expr
-*/
+ * 对列表进行浅拷贝
+ * 对不可更改对象(数值,字符串)重新创建内存空间(深拷贝)
+ */
+void shallowcopy(type_struct* src,type_struct* dest);
+
+void append(type_struct* list,type_struct* item);
+
+void extend(type_struct* list1,type_struct* list2);
+
+int len(type_struct* list);
+
 #endif
