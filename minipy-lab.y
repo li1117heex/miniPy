@@ -263,18 +263,30 @@ atom_expr : atom
 				lastindex = $5 == NULL?(indexstep>0?size:-1)
 				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
 
-				vector<type_struct*> newvec;
+				/*vector<type_struct*> newvec;
 				int i;
 				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
 					for(i=firstindex;i<lastindex && i<size && i>-1;i+=indexstep)
 					{
 						printobj(var->list_head->list_vec->at(i));
+						printf("%d\n",var->list_head->list_vec->at(i));
 						newvec.push_back(var->list_head->list_vec->at(i));
 					}
 				$$=(type_struct*)malloc(sizeof(type_struct));
 				$$->type=3;
 				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
-				$$->list_head->list_vec = (vector<type_struct*>*)&newvec;
+				$$->list_head->list_vec=(vector<type_struct*>*)&newvec;这么写有bug*/
+
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				$$->type=3;
+				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
+				$$->list_head->list_vec = new vector<type_struct*>;
+				int i;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;i!=lastindex && i<size && i>-1;i+=indexstep)
+					{
+						$$->list_head->list_vec->push_back(var->list_head->list_vec->at(i));
+					}
 			}
 		}
         | atom_expr '[' add_expr ']'							/*列表取元素*/
@@ -420,10 +432,11 @@ add_expr : add_expr '+' mul_expr
 						$$ = (type_struct*)malloc(sizeof(type_struct));
 						$$->type = 3;
 						$$->list_head = (list_struct*)malloc(sizeof(list_struct));
-						vector<type_struct*> newvec;
-						newvec.insert(newvec.end(),$1->list_head->list_vec->begin(),$1->list_head->list_vec->end());
-						newvec.insert(newvec.end(),$3->list_head->list_vec->begin(),$3->list_head->list_vec->end());
-						$$->list_head->list_vec = (vector<type_struct*>*)&newvec;
+						$$->list_head->list_vec = new vector<type_struct*>;
+						$$->list_head->list_vec->insert(
+							$$->list_head->list_vec->end(),$1->list_head->list_vec->begin(),$1->list_head->list_vec->end());
+						$$->list_head->list_vec->insert(
+							$$->list_head->list_vec->end(),$3->list_head->list_vec->begin(),$3->list_head->list_vec->end());
 					}
 					break;
 				}
@@ -519,12 +532,12 @@ mul_expr : mul_expr '*' factor
 					$$ = (type_struct*)malloc(sizeof(type_struct));
 					$$->type = 3;
 					$$->list_head = (list_struct*)malloc(sizeof(list_struct));
-					vector<type_struct*> newvec;
+					$$->list_head->list_vec = new vector<type_struct*>;
 					for(i=0;i<mul;i++)
 					{
-						newvec.insert(newvec.end(),$1->list_head->list_vec->begin(),$1->list_head->list_vec->end());
+						$$->list_head->list_vec->insert(
+							$$->list_head->list_vec->end(),$1->list_head->list_vec->begin(),$1->list_head->list_vec->end());
 					}
-					$$->list_head->list_vec = (vector<type_struct*>*)&newvec;
 					break;
 				}
 				default:{
