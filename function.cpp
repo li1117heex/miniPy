@@ -49,6 +49,7 @@ void printobj_1line(type_struct* obj)
 }
 
 void printobj(type_struct* obj){
+	if(obj->error == false){
 	switch(obj->type){
 		case 0:{
 			if(obj->num->type == 0)
@@ -93,6 +94,7 @@ void printobj(type_struct* obj){
 		}
 		default:
 			break;
+	}
 	}
 	printf("\n");
 }
@@ -145,6 +147,8 @@ void shallowcopy(type_struct* src,type_struct* dest){
 			dest->list_head = src->list_head;
 			break;
 		}
+		default:
+			break;
 	}
 	dest->type = src->type;
 }

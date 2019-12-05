@@ -21,6 +21,7 @@ typedef struct num_struct
 struct type_struct;
 typedef struct list_struct
 {
+	bool error;
 	vector<type_struct*>* list_vec; //在链表赋值的时候，变量的值直接取出
 }list_struct;
 //链表带索引
@@ -32,7 +33,8 @@ typedef struct list_index
 //类型非终结符
 typedef struct type_struct
 {
-	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index
+	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index， 5:void
+	bool error;
 	union
 	{
 		num_struct* num;	//number
@@ -45,6 +47,7 @@ typedef struct type_struct
 
 //变量表
 static map<char*, type_struct*> var_map;
+static map<char*, void*> func_map;
 
 //functions
 
