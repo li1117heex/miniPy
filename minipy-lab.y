@@ -352,17 +352,209 @@ atom_expr : atom
 			}
 		}
         | atom_expr  '.' atom '(' arglist opt_comma ')'			/*调用类方法*/
-
+		{
+			void *func;
+			type_struct *arg = (type_struct*)malloc(sizeof(type_struct));
+			type_struct *var;
+			if($1->error || $3->error || $5->error)
+			{
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				$$->error = true;
+			}
+			else
+			{
+				//取ID
+				if($1->type == 1)
+				{
+					map<char*, type_struct*>::iterator iter;
+					for(iter = var_map.begin(); iter != var_map.end(); iter++)
+					{
+						if(strcmp(iter->first, $1->id) == 0)	
+						{
+							break;
+						}
+					}
+					if(iter != var_map.end())  
+       				{
+						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+						var = iter->second;
+					}
+					else
+					{
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = true;
+						yyerror("name is not defined");
+					}
+				}
+				else
+				{
+				//不是列表的ID
+					$$=(type_struct*)malloc(sizeof(type_struct));
+					$$->error = true;
+					yyerror("syntax error");////////////////
+				}
+				//取参数
+				arg->type = 3;
+				arg->error = false;
+				arg->list_head = $5;
+				//取方法
+				if($1->type == 1) // id type//////////////
+				{
+					map<char*, void*>::iterator iter;
+					for(iter = func_map.begin(); iter != func_map.end(); iter++)
+					{
+						if(strcmp(iter->first, $1->id) == 0)	
+						{
+							break;
+						}
+					}
+					if(iter != func_map.end())  
+       				{
+						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+						func = iter->second;
+					}
+					else
+					{
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = true;
+						yyerror("function is not declared");////////////////
+					}
+					
+					
+				}
+				else
+				{
+					$$=(type_struct*)malloc(sizeof(type_struct));
+					$$->error = true;
+					yyerror("syntax error");////////////////
+				}
+				(*func)(var, arg);
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				$$->error = false; 
+				$$->type = 5;    
+			}
+		}
         | atom_expr  '(' arglist opt_comma ')'					/*函数（含参）*/
 		{
-
+			void *func;
+			if($1->error || $3->error)
+			{
+				$$=(type_struct*)malloc(sizeof(type_struct));
+				$$->error = true;
+			}
+			else
+			{
+				if($1->type == 1) // id type//////////////
+				{
+					map<char*, void*>::iterator iter;
+					for(iter = func_map.begin(); iter != func_map.end(); iter++)
+					{
+						if(strcmp(iter->first, $1->id) == 0)	
+						{
+							break;
+						}
+					}
+					if(iter != func_map.end())  
+       				{
+						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+						func = iter->second;
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = false; 
+						(*func)($3);      //不确定这样是否可以
+						$$->type = 5;     // void
+					}
+					else
+					{
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = true;
+						yyerror("function is not declared");////////////////
+					}
+					
+				}
+				else
+				{
+					$$=(type_struct*)malloc(sizeof(type_struct));
+					$$->error = true;
+					yyerror("syntax error");////////////////
+				}
+			}
 		}
         | atom_expr  '('  ')'									/*函数（不含参）*/
+		{
+			void *func;
+			if($1->error)
+			{
+				$$ = $1;
+			}
+			else
+			{
+				if($1->type == 1) // id type//////////////
+				{
+					map<char*, void*>::iterator iter;
+					for(iter = func_map.begin(); iter != func_map.end(); iter++)
+					{
+						if(strcmp(iter->first, $1->id) == 0)	
+						{
+							break;
+						}
+					}
+					if(iter != func_map.end())  
+       				{
+						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+						func = iter->second;
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = false; 
+						(*func)();      //不确定这样是否可以
+						$$->type = 5;     // void
+					}
+					else
+					{
+						$$=(type_struct*)malloc(sizeof(type_struct));
+						$$->error = true;
+						yyerror("function is not declared");////////////////
+					}
+					
+				}
+				else
+				{
+					$$=(type_struct*)malloc(sizeof(type_struct));
+					$$->error = true;
+					yyerror("syntax error");////////////////
+				}
+			}
+		}
         ;
-arglist : add_expr
-        | arglist ',' add_expr 
-        ;
-        ;      
+arglist: add_expr
+	  {
+		if($1->error)
+		{
+			$$ = (list_struct*)malloc(sizeof(list_struct));
+			$$->error = true;
+		}
+		else
+		{
+			$$ = (list_struct*)malloc(sizeof(list_struct));
+			$$->error = false;
+			$$->list_vec=new vector<type_struct*>;
+			$$->list_vec->push_back($1);
+		}
+		
+	  }
+      | arglist ',' add_expr 
+	  {
+		if($3->error)
+		{
+			$$=(list_struct*)malloc(sizeof(list_struct));
+			$$->error = true; 
+		}
+		else
+		{
+			$1->list_vec->push_back($3);
+			$$ = $1;
+		}
+		
+	  }
+      ;      
 List  : '[' ']'
 		{
 			$$ = (list_struct*)malloc(sizeof(list_struct));
