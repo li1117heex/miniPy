@@ -9,8 +9,15 @@ using namespace std;
 #include "lex.yy.c"
 #include "property.h"
 
+//变量表
+map<char*, type_struct*> var_map;
+//输出使能(true为可以输出)
+bool output = true;
+//错误标志
+bool error_flag = false;
+
 int yyparse(void);
-void yyerror(char *s){cout << "error: " << s << endl<<"miniPy> ";}
+void yyerror(char *s){cout << "error: " << s << endl; error_flag = true;}
 int yywrap(void){return 1;}
 
 %}
@@ -29,7 +36,7 @@ int yywrap(void){return 1;}
 %token <real> REAL
 %token <name> STRING_LITERAL
 %type <num_symbol> number
-%type <list_symbol> List List_items
+%type <list_symbol> List List_items arglist
 %type <type_symbol> atom atom_expr add_expr mul_expr factor assignExpr sub_expr stat slice_op
 
 %left '+' '-'
@@ -41,6 +48,8 @@ int yywrap(void){return 1;}
 Start : prompt Lines  {cout << "a line has been generated" << endl;}
       ;
 Lines : Lines  stat '\n' prompt
+	{
+	}
       | Lines  '\n' prompt
       |
       | error '\n' {yyerrok;}
@@ -49,7 +58,10 @@ prompt : {cout << "miniPy> ";}
        ;
 stat  : assignExpr
 	{
-		printobj($1);
+		if(output && !error_flag)
+			print_($1);
+		output = true;
+		error_flag = false;
 		$$ = $1;
 	}
       ;
@@ -70,7 +82,8 @@ assignExpr:
 						iter++;
 					}
 				}
-				var_map.insert(map<char*, type_struct*>::value_type($1->id, $3));  //存储原来的，上交浅拷贝的
+				if(!error_flag)
+					var_map.insert(map<char*, type_struct*>::value_type($1->id, $3));  //存储原来的，上交浅拷贝的
 				shallowcopy($3,$1);
 				$$ = $1;
 			}
@@ -263,20 +276,6 @@ atom_expr : atom
 				lastindex = $5 == NULL?(indexstep>0?size:-1)
 				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
 
-				/*vector<type_struct*> newvec;
-				int i;
-				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
-					for(i=firstindex;i<lastindex && i<size && i>-1;i+=indexstep)
-					{
-						printobj(var->list_head->list_vec->at(i));
-						printf("%d\n",var->list_head->list_vec->at(i));
-						newvec.push_back(var->list_head->list_vec->at(i));
-					}
-				$$=(type_struct*)malloc(sizeof(type_struct));
-				$$->type=3;
-				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
-				$$->list_head->list_vec=(vector<type_struct*>*)&newvec;这么写有bug*/
-
 				$$=(type_struct*)malloc(sizeof(type_struct));
 				$$->type=3;
 				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
@@ -353,206 +352,135 @@ atom_expr : atom
 		}
         | atom_expr  '.' atom '(' arglist opt_comma ')'			/*调用类方法*/
 		{
-			void *func;
-			type_struct *arg = (type_struct*)malloc(sizeof(type_struct));
+			type_struct* (*pf)(list_struct*);
 			type_struct *var;
-			if($1->error || $3->error || $5->error)
+
+			//取ID
+			if($1->type == 1)
 			{
-				$$=(type_struct*)malloc(sizeof(type_struct));
-				$$->error = true;
+				map<char*, type_struct*>::iterator iter;
+				for(iter = var_map.begin(); iter != var_map.end(); iter++)
+				{
+					if(strcmp(iter->first, $1->id) == 0)	
+					{
+						break;
+					}
+				}
+				if(iter != var_map.end())  
+				{
+					// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+					var = iter->second;
+				}
+				else
+				{
+					yyerror("name is not defined");
+				}
 			}
 			else
 			{
-				//取ID
-				if($1->type == 1)
-				{
-					map<char*, type_struct*>::iterator iter;
-					for(iter = var_map.begin(); iter != var_map.end(); iter++)
-					{
-						if(strcmp(iter->first, $1->id) == 0)	
-						{
-							break;
-						}
-					}
-					if(iter != var_map.end())  
-       				{
-						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
-						var = iter->second;
-					}
-					else
-					{
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = true;
-						yyerror("name is not defined");
-					}
-				}
-				else
-				{
-				//不是列表的ID
-					$$=(type_struct*)malloc(sizeof(type_struct));
-					$$->error = true;
-					yyerror("syntax error");////////////////
-				}
-				//取参数
-				arg->type = 3;
-				arg->error = false;
-				arg->list_head = $5;
-				//取方法
-				if($1->type == 1) // id type//////////////
-				{
-					map<char*, void*>::iterator iter;
-					for(iter = func_map.begin(); iter != func_map.end(); iter++)
-					{
-						if(strcmp(iter->first, $1->id) == 0)	
-						{
-							break;
-						}
-					}
-					if(iter != func_map.end())  
-       				{
-						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
-						func = iter->second;
-					}
-					else
-					{
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = true;
-						yyerror("function is not declared");////////////////
-					}
-					
-					
-				}
-				else
-				{
-					$$=(type_struct*)malloc(sizeof(type_struct));
-					$$->error = true;
-					yyerror("syntax error");////////////////
-				}
-				(*func)(var, arg);
-				$$=(type_struct*)malloc(sizeof(type_struct));
-				$$->error = false; 
-				$$->type = 5;    
+				yyerror("object must have a name");////////////////
 			}
+			//取方法
+			if($3->type == 1) // id type//////////////
+			{
+				map<char*, type_struct* (*)(list_struct*)>::iterator iter;
+				for(iter = func_map.begin(); iter != func_map.end(); iter++)
+				{
+					if(strcmp(iter->first, $3->id) == 0)	
+					{
+						break;
+					}
+				}
+				if(iter != func_map.end())  
+				{
+					// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+					pf = iter->second;
+					//取参数
+					$5->list_vec->insert($5->list_vec->begin(), var);
+					//调用
+					$$ = pf($5);
+				}
+				else
+				{
+					yyerror("function is not declared");////////////////
+				}
+			}
+			else
+			{
+				yyerror("function must have a name");////////////////
+			}			
 		}
         | atom_expr  '(' arglist opt_comma ')'					/*函数（含参）*/
 		{
-			void *func;
-			if($1->error || $3->error)
+			type_struct* (*pf)(list_struct*);
+
+			if($1->type == 1) // id type//////////////
 			{
-				$$=(type_struct*)malloc(sizeof(type_struct));
-				$$->error = true;
-			}
-			else
-			{
-				if($1->type == 1) // id type//////////////
+				map<char*, type_struct* (*)(list_struct*)>::iterator iter;
+				for(iter = func_map.begin(); iter != func_map.end(); iter++)
 				{
-					map<char*, void*>::iterator iter;
-					for(iter = func_map.begin(); iter != func_map.end(); iter++)
+					if(strcmp(iter->first, $1->id) == 0)	
 					{
-						if(strcmp(iter->first, $1->id) == 0)	
-						{
-							break;
-						}
+						break;
 					}
-					if(iter != func_map.end())  
-       				{
-						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
-						func = iter->second;
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = false; 
-						(*func)($3);      //不确定这样是否可以
-						$$->type = 5;     // void
-					}
-					else
-					{
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = true;
-						yyerror("function is not declared");////////////////
-					}
-					
+				}
+				if(iter != func_map.end())  
+				{
+					pf = iter->second;
+					$$ = pf($3);
 				}
 				else
 				{
-					$$=(type_struct*)malloc(sizeof(type_struct));
-					$$->error = true;
-					yyerror("syntax error");////////////////
+					yyerror("function is not declared");////////////////
 				}
+			}
+			else
+			{
+				yyerror("function must have a name");////////////////
 			}
 		}
         | atom_expr  '('  ')'									/*函数（不含参）*/
 		{
-			void *func;
-			if($1->error)
+			type_struct* (*pf)(list_struct*);
+			list_struct* args = new list_struct;
+			args->list_vec = new vector<type_struct*>;	//empty list
+
+			if($1->type == 1) // id type//////////////
 			{
-				$$ = $1;
-			}
-			else
-			{
-				if($1->type == 1) // id type//////////////
+				map<char*, type_struct* (*)(list_struct*)>::iterator iter;
+				for(iter = func_map.begin(); iter != func_map.end(); iter++)
 				{
-					map<char*, void*>::iterator iter;
-					for(iter = func_map.begin(); iter != func_map.end(); iter++)
+					if(strcmp(iter->first, $1->id) == 0)	
 					{
-						if(strcmp(iter->first, $1->id) == 0)	
-						{
-							break;
-						}
+						break;
 					}
-					if(iter != func_map.end())  
-       				{
-						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
-						func = iter->second;
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = false; 
-						(*func)();      //不确定这样是否可以
-						$$->type = 5;     // void
-					}
-					else
-					{
-						$$=(type_struct*)malloc(sizeof(type_struct));
-						$$->error = true;
-						yyerror("function is not declared");////////////////
-					}
-					
+				}
+				if(iter != func_map.end())  
+				{
+					pf = iter->second;
+					$$ = pf(args);
 				}
 				else
 				{
-					$$=(type_struct*)malloc(sizeof(type_struct));
-					$$->error = true;
-					yyerror("syntax error");////////////////
+					yyerror("function is not declared");////////////////
 				}
+			}
+			else
+			{
+				yyerror("function must have a name");////////////////
 			}
 		}
         ;
 arglist: add_expr
 	  {
-		if($1->error)
-		{
-			$$ = (list_struct*)malloc(sizeof(list_struct));
-			$$->error = true;
-		}
-		else
-		{
-			$$ = (list_struct*)malloc(sizeof(list_struct));
-			$$->error = false;
-			$$->list_vec=new vector<type_struct*>;
-			$$->list_vec->push_back($1);
-		}
-		
+		$$ = (list_struct*)malloc(sizeof(list_struct));
+		$$->list_vec=new vector<type_struct*>;
+		$$->list_vec->push_back($1);		
 	  }
       | arglist ',' add_expr 
 	  {
-		if($3->error)
-		{
-			$$=(list_struct*)malloc(sizeof(list_struct));
-			$$->error = true; 
-		}
-		else
-		{
 			$1->list_vec->push_back($3);
 			$$ = $1;
-		}
-		
 	  }
       ;      
 List  : '[' ']'
@@ -826,5 +754,6 @@ mul_expr : mul_expr '*' factor
 
 int main()
 {
-   return yyparse();
+	func_map_init();	
+    return yyparse();
 }

@@ -32,7 +32,7 @@ typedef struct list_index
 //类型非终结符
 typedef struct type_struct
 {
-	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index
+	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index, 5:void
 	union
 	{
 		num_struct* num;	//number
@@ -44,27 +44,43 @@ typedef struct type_struct
 }type_struct;
 
 //变量表
-static map<char*, type_struct*> var_map;
+extern map<char*, type_struct*> var_map;
+
+//函数表
+extern map<char*, type_struct* (*)(list_struct*)> func_map;
 
 //functions
 
-//打印type_struct可能包含的类型的对象
-void printobj(type_struct* obj);
-
-//TODO: 这个函数是干什么的？
-//uncompleted
-char* type(type_struct* obj);
-
+//protected
 /*
  * 对列表进行浅拷贝
  * 对不可更改对象(数值,字符串)重新创建内存空间(深拷贝)
- */
+ */ 
 void shallowcopy(type_struct* src,type_struct* dest);
 
-void append(type_struct* list,type_struct* item);
+//初始化func_map
+void func_map_init();
 
-void extend(type_struct* list1,type_struct* list2);
+//public
+//打印type_struct可能包含的类型的对象
+//type_struct* -> void
+void print_(type_struct* obj);
+type_struct* print(list_struct* args);
 
-int len(type_struct* list);
+//TODO: 这个函数是干什么的？
+//uncompleted
+//void type(type_struct* obj)
+type_struct* type(list_struct* args);
+
+//void append(type_struct* list,type_struct* item);
+type_struct* append(list_struct* args);
+
+//void extend(type_struct* list1,type_struct* list2);
+type_struct* extend(list_struct* args);
+
+//int len(type_struct* list);
+type_struct* len(list_struct* args);
+
+type_struct* quit(list_struct* args);
 
 #endif
