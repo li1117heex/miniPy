@@ -69,3 +69,24 @@ yacc代码中完成了文法符号属性的设计
     - 类似的, 创建列表方法表map<char*, 函数指针> list_fun_map
     - 函数参数arglist, 定义为list_type, 一个一个读取其元素(每一个参数)即可
     - type_struct.type 中加一个void类型, 例如规定为5
+    
+### 12/8 吴健宗
+#### 问题
+- 李维晟之前定义的`void type(type_struct* obj)`函数不知道是什么功能, 现在还需要不需要了
+- 李维晟之前定义的另一个函数`void extend(type_struct* list1,type_struct* list2)`貌似是用来合并两个链表, 是否可以直接在`add_expr : add_expr '+' mul_expr`的产生式中调用, 以优化代码
+
+#### 更新
+- 通过error_flag标志变量实现错误处理, 一旦出错, error_flag置1, 不输出, 不赋值, 等一句规约完成后, 再将error_flag置回0)
+- 与上一条类似, 使用output标志变量, 对输出进行屏蔽, 保证print()函数执行过后最后的`stat -> assignExpr`表达式不会再输出一次
+- 实现函数的调用, 包括: func_map的查找, 函数指针的调用等, 可以正常使用已实现的函数
+- 列表方法`atom_expr  '.' atom '(' arglist opt_comma ')'`传参时, 将列表自己的type_struct也加入args里面(用insert前插, 放在list_vec的第一个位置)
+- 已实现函数: print(), list.append(), len(), quit().
+
+#### TODO
+- 继续实现其余内置函数, 函数具体功能尽量与python保持一致
+    - range()
+    - list()
+- 列表切片赋值, 可以考虑李维晟之前说过的建立新数据结构`list_slice`, 里面存放list_vec, indexes(切片所计算出的index集合)
+- 内存释放. 代码到目前为止没有考虑过内存释放的问题, 等所有功能实现完毕之后可以加入内存释放功能
+    1. 在规约式里free(delete)无用的内存空间
+    2. 在quit()函数中释放变量表空间(变量表本身会在程序结束时自动释放, 但是不可约变量如num_struct等是手动malloc得来, 需要人工释放)
