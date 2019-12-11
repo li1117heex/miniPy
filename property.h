@@ -83,4 +83,7 @@ type_struct* len(list_struct* args);
 
 type_struct* quit(list_struct* args);
 
+type_struct* list(list_struct* args);
+
+type_struct* range(list_struct* args);
 #endif

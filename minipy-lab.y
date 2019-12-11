@@ -5,7 +5,7 @@
 using namespace std;
 #include <iostream>
 #include <string>
-
+#include <cstring>
 #include "lex.yy.c"
 #include "property.h"
 
@@ -71,17 +71,21 @@ assignExpr:
 			if($1->type == 1)	/*ID，存储变量到变量表*/
 			{	
 				map<char*, type_struct*>::iterator iter;
-				for(iter = var_map.begin(); iter != var_map.end();)
+				if(!error_flag)
 				{
-					if(strcmp(iter->first, $1->id) == 0)	//判断相等，把之前的去掉再insert新的
+					for(iter = var_map.begin(); iter != var_map.end();)
 					{
-						iter = var_map.erase(iter);
-						break;
-					}
-					else{
-						iter++;
+						if(strcmp(iter->first, $1->id) == 0)	//判断相等，把之前的去掉再insert新的
+						{
+							iter = var_map.erase(iter);
+							break;
+						}
+						else{
+							iter++;
+						}
 					}
 				}
+				
 				if(!error_flag)
 					var_map.insert(map<char*, type_struct*>::value_type($1->id, $3));  //存储原来的，上交浅拷贝的
 				shallowcopy($3,$1);
