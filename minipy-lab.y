@@ -721,6 +721,20 @@ add_expr : add_expr '+' mul_expr
 					}
 					break;
 				}
+				case 2:{
+					if($3->type != 2)
+						yyerror("TypeError, unsupported operand type(s) for +: 'int' and 'str'");
+					else
+					{
+						$$ = new type_struct;
+						$$->type = 2;
+						$$->str = (char*) malloc(strlen($1->str)+strlen($3->str)+1);
+						strcpy($$->str,$1->str);
+						strcpy($$->str+strlen($3->str),$3->str);
+						$$->str[strlen($1->str)+strlen($3->str)] = '\0';
+					}
+					break;
+				}
 				default:{
 					yyerror("type error");
 				}
@@ -819,6 +833,22 @@ mul_expr : mul_expr '*' factor
 						$$->list_head->list_vec->insert(
 							$$->list_head->list_vec->end(),$1->list_head->list_vec->begin(),$1->list_head->list_vec->end());
 					}
+					break;
+				}
+				case 2:{
+					if($3->type != 0 || $3->num->type != 0)
+						yyerror("can't multiply sequence by non-int of type 'str'");
+					$$ = new type_struct;
+					$$->type = 2;
+					$$->str = (char*) malloc($3->num->int_value*strlen($1->str)+1);
+					int i;
+					char* place = $$->str;
+					for(i=0;i<$3->num->int_value;i++)
+					{
+						strcpy(place,$1->str);
+						place+=strlen($1->str);
+					}
+					*place = '\0';
 					break;
 				}
 				default:{
