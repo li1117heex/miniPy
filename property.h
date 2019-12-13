@@ -29,10 +29,16 @@ typedef struct list_index
 	int index;
 	vector<type_struct*>* list_vec; //在链表赋值的时候，变量的值直接取出
 }list_index;
+//链表带区间索引
+typedef struct list_slice
+{
+	int firstindex,lastindex,indexstep;
+	vector<type_struct*>* list_vec; //在链表赋值的时候，变量的值直接取出
+}list_slice;
 //类型非终结符
 typedef struct type_struct
 {
-	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index, 5:void
+	int type;	//0:number, 1:ID, 2:string literal, 3:list, 4:list_index, 5:void, 6:list_slice
 	union
 	{
 		num_struct* num;	//number
@@ -40,6 +46,7 @@ typedef struct type_struct
 		char* str;			//string literal
 		list_struct* list_head;	//list
 		list_index* List_Index;
+		list_slice* List_Slice;
 	};
 }type_struct;
 

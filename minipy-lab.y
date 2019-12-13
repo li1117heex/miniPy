@@ -97,6 +97,39 @@ assignExpr:
 				shallowcopy($3,$1);
 				$$ = $1;
 			}
+			else if($1->type == 6)
+			{
+				if($3->type!=3)
+				{
+					yyerror("can only assign an iterable");
+				}
+				else
+				{
+					int i,newsize=0;
+					int firstindex=$1->List_Slice->firstindex;
+					int lastindex=$1->List_Slice->lastindex;
+					int indexstep=$1->List_Slice->indexstep;
+					int size = $1->List_Slice->list_vec->size();
+					bool steppn=indexstep>0;
+					if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+						for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+						{
+							newsize++;
+						}
+					if($3->list_head->list_vec->size()!=newsize)
+						yyerror("attempt to assign sequence to extended slice of different size");
+					else
+					{
+						$$=$3;
+						int j=0;
+						if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+							for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+							{
+								$1->List_Slice->list_vec->at(i)=($3->list_head->list_vec->at(j++));
+							}
+					}
+				}
+			}
 			else
 			{
 				yyerror("can't assign to literal");
@@ -166,6 +199,24 @@ factor : '+' factor %prec unimus
 				$$=(type_struct*)malloc(sizeof(type_struct));
 				shallowcopy($1->List_Index->list_vec->at($1->List_Index->index),$$);
 			}
+			else if($1->type == 6)
+			{
+				$$=new type_struct;
+				$$->type=3;
+				$$->list_head=new list_struct;
+				$$->list_head->list_vec = new vector<type_struct*>;
+				int i;
+				int firstindex=$1->List_Slice->firstindex;
+				int lastindex=$1->List_Slice->lastindex;
+				int indexstep=$1->List_Slice->indexstep;
+				int size = $1->List_Slice->list_vec->size();
+				bool steppn=indexstep>0;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+					{
+						$$->list_head->list_vec->push_back($1->List_Slice->list_vec->at(i));
+					}
+			}
 			else{
 				$$ = $1;
 			}
@@ -234,17 +285,31 @@ atom_expr : atom
 			type_struct* var;
 			int firstindex,lastindex,indexstep;
 
-			if($1->type == 0)
-			{
-				yyerror("TypeError, 'int' object is not subscriptable");
-			}
-			else if($1->type == 2 || $1->type == 3)
+			if($1->type != 1 && $1->type != 4 && $1->type != 6)
 			{
 				var = $1;
 			}
 			else if($1->type == 4)
 			{
 				var = $1->List_Index->list_vec->at($1->List_Index->index);
+			}
+			else if($1->type == 6)
+			{
+				var=new type_struct;
+				var->type=3;
+				var->list_head=new list_struct;
+				var->list_head->list_vec = new vector<type_struct*>;
+				int i;
+				int firstindex=$1->List_Slice->firstindex;
+				int lastindex=$1->List_Slice->lastindex;
+				int indexstep=$1->List_Slice->indexstep;
+				int size = $1->List_Slice->list_vec->size();
+				bool steppn=indexstep>0;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+					{
+						var->list_head->list_vec->push_back($1->List_Slice->list_vec->at(i));
+					}
 			}
 			else	/*ID，取变量*/
 			{
@@ -267,10 +332,42 @@ atom_expr : atom
 				}  
 			}
 
-			if(var->type == 0 || var->type == 1)
+			if(var->type == 0 || var->type == 1 || var->type == 5)
 				yyerror("the object must be a list or string");
 			else if(var->type == 2)
-				yyerror("string complex slice not support yet"); //not support yet
+			{
+				int size = strlen(var->str);
+				indexstep = $6 == NULL?1:$6->num->int_value;
+				firstindex = $3 == NULL?(indexstep>0?0:size-1)
+				:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
+				lastindex = $5 == NULL?(indexstep>0?size:-1)
+				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
+				$$ = (type_struct*)malloc(sizeof(type_struct));
+				$$->type=2;
+				$$->str=(char*)malloc(size+1);
+				int i,j=0;
+				char* place=$$->str;
+				bool steppn=indexstep>0;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+					{
+						strncpy(place,var->str+i,1);
+						place++;
+					}
+				*place='\0';
+			}
+			else if($3 != NULL && ($3->type != 0 || $3->num->type != 0))
+			{
+				yyerror("firstindex must be int type!");
+			}
+			else if($5 != NULL && ($5->type != 0 || $5->num->type != 0))
+			{
+				yyerror("lastindex must be int type!");
+			}
+			else if($6 != NULL && ($6->type != 0 || $6->num->type != 0))
+			{
+				yyerror("indexstep must be int type!");
+			}
 			else
 			{
 				int size = var->list_head->list_vec->size();
@@ -280,16 +377,25 @@ atom_expr : atom
 				lastindex = $5 == NULL?(indexstep>0?size:-1)
 				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
 
-				$$=(type_struct*)malloc(sizeof(type_struct));
+				/*$$=(type_struct*)malloc(sizeof(type_struct));
 				$$->type=3;
 				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
 				$$->list_head->list_vec = new vector<type_struct*>;
 				int i;
+				bool steppn=indexstep>0;
 				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
-					for(i=firstindex;i!=lastindex && i<size && i>-1;i+=indexstep)
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
 					{
 						$$->list_head->list_vec->push_back(var->list_head->list_vec->at(i));
 					}
+				*/
+				$$=new type_struct;;
+				$$->type=6;
+				$$->List_Slice = new list_slice;
+				$$->List_Slice->firstindex = firstindex;
+				$$->List_Slice->lastindex = lastindex;
+				$$->List_Slice->indexstep = indexstep;
+				$$->List_Slice->list_vec = var->list_head->list_vec;
 			}
 		}
         | atom_expr '[' add_expr ']'							/*列表取元素*/
@@ -297,13 +403,31 @@ atom_expr : atom
 			type_struct* var;
 			int index;
 
-			if($1->type != 1 && $1->type != 4)
+			if($1->type != 1 && $1->type != 4 && $1->type != 6)
 			{
 				var = $1;
 			}
 			else if($1->type == 4)
 			{
 				var = $1->List_Index->list_vec->at($1->List_Index->index);
+			}
+			else if($1->type == 6)
+			{
+				var=new type_struct;
+				var->type=3;
+				var->list_head=new list_struct;
+				var->list_head->list_vec = new vector<type_struct*>;
+				int i;
+				int firstindex=$1->List_Slice->firstindex;
+				int lastindex=$1->List_Slice->lastindex;
+				int indexstep=$1->List_Slice->indexstep;
+				int size = $1->List_Slice->list_vec->size();
+				bool steppn=indexstep>0;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+					{
+						var->list_head->list_vec->push_back($1->List_Slice->list_vec->at(i));
+					}
 			}
 			else	/*ID，取变量*/
 			{
@@ -328,7 +452,7 @@ atom_expr : atom
 
 			if($3->type != 0 || $3->num->type != 0)
 				yyerror("index must be int type!");
-			else if(var->type == 0 || var->type == 1)
+			else if(var->type == 0 || var->type == 1 || var->type == 5)
 				yyerror("the object must be a list or string");//////////
 			else if(var->type == 2)
 			{
@@ -345,13 +469,12 @@ atom_expr : atom
 			{
 				index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+var->list_head->list_vec->size();
 				if(index >=var->list_head->list_vec->size() || index < 0 )
-					yyerror("string index out of range");
+					yyerror("list index out of range");
 				$$ = (type_struct*)malloc(sizeof(type_struct));
 				$$->type=4;
 				$$->List_Index = (list_index*)malloc(sizeof(list_index));
 				$$->List_Index->index = index;
 				$$->List_Index->list_vec = var->list_head->list_vec;
-
 			}
 		}
         | atom_expr  '.' atom '(' arglist opt_comma ')'			/*调用类方法*/
@@ -380,9 +503,43 @@ atom_expr : atom
 					yyerror("name is not defined");
 				}
 			}
-			else
+			else if($1->type == 0)
 			{
-				yyerror("object must have a name");////////////////
+				yyerror("number type has no attribute append");
+			}
+			else if($1->type == 2)
+			{
+				yyerror("string type has no attribute append");
+			}
+			else if($1->type == 5)
+			{
+				yyerror("void type has no attribute append");
+			}
+			else if($1->type == 3)
+			{
+				var = $1;
+			}
+			else if($1->type == 6)
+			{
+				var=new type_struct;
+				var->type=3;
+				var->list_head=new list_struct;
+				var->list_head->list_vec = new vector<type_struct*>;
+				int i;
+				int firstindex=$1->List_Slice->firstindex;
+				int lastindex=$1->List_Slice->lastindex;
+				int indexstep=$1->List_Slice->indexstep;
+				int size = $1->List_Slice->list_vec->size();
+				bool steppn=indexstep>0;
+				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+					{
+						var->list_head->list_vec->push_back($1->List_Slice->list_vec->at(i));
+					}
+			}
+			else//$1->type == 4
+			{
+				var = $1->List_Index->list_vec->at($1->List_Index->index);
 			}
 			//取方法
 			if($3->type == 1) // id type//////////////
