@@ -6,6 +6,8 @@ using namespace std;
 #include <iostream>
 #include <string>
 #include <cstring>
+#include <sys/wait.h>
+#include <pthread.h>
 #include "lex.yy.c"
 #include "property.h"
 
@@ -339,70 +341,72 @@ atom_expr : atom
 				}  
 			}
 
-			if(var->type == 0 || var->type == 1 || var->type == 5)
-				yyerror("the object must be a list or string");
-			else if(var->type == 2)
-			{
-				int size = strlen(var->str);
-				indexstep = $6 == NULL?1:$6->num->int_value;
-				firstindex = $3 == NULL?(indexstep>0?0:size-1)
-				:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
-				lastindex = $5 == NULL?(indexstep>0?size:-1)
-				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
-				$$ = (type_struct*)malloc(sizeof(type_struct));
-				$$->type=2;
-				$$->str=(char*)malloc(size+1);
-				int i,j=0;
-				char* place=$$->str;
-				bool steppn=indexstep>0;
-				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
-					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
-					{
-						strncpy(place,var->str+i,1);
-						place++;
-					}
-				*place='\0';
-			}
-			else if($3 != NULL && ($3->type != 0 || $3->num->type != 0))
-			{
-				yyerror("firstindex must be int type!");
-			}
-			else if($5 != NULL && ($5->type != 0 || $5->num->type != 0))
-			{
-				yyerror("lastindex must be int type!");
-			}
-			else if($6 != NULL && ($6->type != 0 || $6->num->type != 0))
-			{
-				yyerror("indexstep must be int type!");
-			}
-			else
-			{
-				int size = var->list_head->list_vec->size();
-				indexstep = $6 == NULL?1:$6->num->int_value;
-				firstindex = $3 == NULL?(indexstep>0?0:size-1)
-				:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
-				lastindex = $5 == NULL?(indexstep>0?size:-1)
-				:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
+			if(!error_flag){
+				if(var->type == 0 || var->type == 1 || var->type == 5)
+					yyerror("the object must be a list or string");
+				else if(var->type == 2)
+				{
+					int size = strlen(var->str);
+					indexstep = $6 == NULL?1:$6->num->int_value;
+					firstindex = $3 == NULL?(indexstep>0?0:size-1)
+					:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
+					lastindex = $5 == NULL?(indexstep>0?size:-1)
+					:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
+					$$ = (type_struct*)malloc(sizeof(type_struct));
+					$$->type=2;
+					$$->str=(char*)malloc(size+1);
+					int i,j=0;
+					char* place=$$->str;
+					bool steppn=indexstep>0;
+					if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+						for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+						{
+							strncpy(place,var->str+i,1);
+							place++;
+						}
+					*place='\0';
+				}
+				else if($3 != NULL && ($3->type != 0 || $3->num->type != 0))
+				{
+					yyerror("firstindex must be int type!");
+				}
+				else if($5 != NULL && ($5->type != 0 || $5->num->type != 0))
+				{
+					yyerror("lastindex must be int type!");
+				}
+				else if($6 != NULL && ($6->type != 0 || $6->num->type != 0))
+				{
+					yyerror("indexstep must be int type!");
+				}
+				else
+				{
+					int size = var->list_head->list_vec->size();
+					indexstep = $6 == NULL?1:$6->num->int_value;
+					firstindex = $3 == NULL?(indexstep>0?0:size-1)
+					:($3->num->int_value>=0?$3->num->int_value:$3->num->int_value+size);
+					lastindex = $5 == NULL?(indexstep>0?size:-1)
+					:($5->num->int_value>=0?$5->num->int_value:$5->num->int_value+size); //-1是为了取完list
 
-				/*$$=(type_struct*)malloc(sizeof(type_struct));
-				$$->type=3;
-				$$->list_head=(list_struct*)malloc(sizeof(list_struct));
-				$$->list_head->list_vec = new vector<type_struct*>;
-				int i;
-				bool steppn=indexstep>0;
-				if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
-					for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
-					{
-						$$->list_head->list_vec->push_back(var->list_head->list_vec->at(i));
-					}
-				*/
-				$$=new type_struct;;
-				$$->type=6;
-				$$->List_Slice = new list_slice;
-				$$->List_Slice->firstindex = firstindex;
-				$$->List_Slice->lastindex = lastindex;
-				$$->List_Slice->indexstep = indexstep;
-				$$->List_Slice->list_vec = var->list_head->list_vec;
+					/*$$=(type_struct*)malloc(sizeof(type_struct));
+					$$->type=3;
+					$$->list_head=(list_struct*)malloc(sizeof(list_struct));
+					$$->list_head->list_vec = new vector<type_struct*>;
+					int i;
+					bool steppn=indexstep>0;
+					if((firstindex-lastindex)*indexstep<0) //只有步长与目标同向才非空表
+						for(i=firstindex;(steppn && i<lastindex && i<size)||(!steppn && i>lastindex && i>-1);i+=indexstep)
+						{
+							$$->list_head->list_vec->push_back(var->list_head->list_vec->at(i));
+						}
+					*/
+					$$=new type_struct;;
+					$$->type=6;
+					$$->List_Slice = new list_slice;
+					$$->List_Slice->firstindex = firstindex;
+					$$->List_Slice->lastindex = lastindex;
+					$$->List_Slice->indexstep = indexstep;
+					$$->List_Slice->list_vec = var->list_head->list_vec;
+				}
 			}
 		}
         | atom_expr '[' add_expr ']'							/*列表取元素*/
@@ -456,32 +460,41 @@ atom_expr : atom
 					yyerror("name is not defined");////////////////
 				}  
 			}
-
-			if($3->type != 0 || $3->num->type != 0)
-				yyerror("index must be int type!");
-			else if(var->type == 0 || var->type == 1 || var->type == 5)
-				yyerror("the object must be a list or string");//////////
-			else if(var->type == 2)
+			if(!error_flag)
 			{
-				index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+strlen(var->str);
-				if(index >=strlen(var->str) || index < 0 )
-					yyerror("string index out of range");
-				$$ = (type_struct*)malloc(sizeof(type_struct));
-				$$->type=2;
-				$$->str=(char*)malloc(2);
-				strncpy($$->str,var->str+index,1);
-				$$->str[1]='\0';
-			}
-			else //var->type == 3
-			{
-				index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+var->list_head->list_vec->size();
-				if(index >=var->list_head->list_vec->size() || index < 0 )
-					yyerror("list index out of range");
-				$$ = (type_struct*)malloc(sizeof(type_struct));
-				$$->type=4;
-				$$->List_Index = (list_index*)malloc(sizeof(list_index));
-				$$->List_Index->index = index;
-				$$->List_Index->list_vec = var->list_head->list_vec;
+				if($3->type != 0 || $3->num->type != 0)
+					yyerror("index must be int type!");
+				else if(var->type == 0 || var->type == 1 || var->type == 5)
+					yyerror("the object must be a list or string");//////////
+				else if(var->type == 2)
+				{
+					index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+strlen(var->str);
+					if(index >=strlen(var->str) || index < 0 )
+						yyerror("string index out of range");
+					$$ = (type_struct*)malloc(sizeof(type_struct));
+					$$->type=2;
+					$$->str=(char*)malloc(2);
+					strncpy($$->str,var->str+index,1);
+					$$->str[1]='\0';
+				}
+				else //var->type == 3
+				{
+					index=$3->num->int_value>=0?$3->num->int_value:$3->num->int_value+var->list_head->list_vec->size();
+					if(index >=var->list_head->list_vec->size() || index < 0 )
+					{
+						yyerror("list index out of range");
+						$$ = new type_struct;
+						$$->type = 5;
+					}
+					else
+					{
+						$$ = (type_struct*)malloc(sizeof(type_struct));
+						$$->type=4;
+						$$->List_Index = (list_index*)malloc(sizeof(list_index));
+						$$->List_Index->index = index;
+						$$->List_Index->list_vec = var->list_head->list_vec;
+					}
+				}
 			}
 		}
         | atom_expr  '.' atom '(' arglist opt_comma ')'			/*调用类方法*/
@@ -548,34 +561,36 @@ atom_expr : atom
 			{
 				var = $1->List_Index->list_vec->at($1->List_Index->index);
 			}
-			//取方法
-			if($3->type == 1) // id type//////////////
-			{
-				map<char*, type_struct* (*)(list_struct*)>::iterator iter;
-				for(iter = func_map.begin(); iter != func_map.end(); iter++)
+			if(!error_flag){
+				//取方法
+				if($3->type == 1) // id type//////////////
 				{
-					if(strcmp(iter->first, $3->id) == 0)	
+					map<char*, type_struct* (*)(list_struct*)>::iterator iter;
+					for(iter = func_map.begin(); iter != func_map.end(); iter++)
 					{
-						break;
+						if(strcmp(iter->first, $3->id) == 0)	
+						{
+							break;
+						}
 					}
-				}
-				if(iter != func_map.end())  
-				{
-					// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
-					pf = iter->second;
-					//取参数
-					$5->list_vec->insert($5->list_vec->begin(), var);
-					//调用
-					$$ = pf($5);
+					if(iter != func_map.end())  
+					{
+						// cout<<"Find, the type of the variable is "<<iter->second->type<<endl;  
+						pf = iter->second;
+						//取参数
+						$5->list_vec->insert($5->list_vec->begin(), var);
+						//调用
+						$$ = pf($5);
+					}
+					else
+					{
+						yyerror("function is not declared");////////////////
+					}
 				}
 				else
 				{
-					yyerror("function is not declared");////////////////
+					yyerror("function must have a name");////////////////
 				}
-			}
-			else
-			{
-				yyerror("function must have a name");////////////////
 			}			
 		}
         | atom_expr  '(' arglist opt_comma ')'					/*函数（含参）*/
@@ -952,6 +967,6 @@ mul_expr : mul_expr '*' factor
 
 int main()
 {
-	func_map_init();	
-    return yyparse();
+	func_map_init();
+	return yyparse();
 }
