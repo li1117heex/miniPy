@@ -17,7 +17,14 @@ bool output = true;
 bool error_flag = false;
 
 int yyparse(void);
-void yyerror(char *s){cout << "error: " << s << endl; error_flag = true;}
+void yyerror(char *s)
+{
+	if(!error_flag)
+ 	{
+		cout << "error: " << s << endl;
+		error_flag = true;
+	}
+}
 int yywrap(void){return 1;}
 
 %}
